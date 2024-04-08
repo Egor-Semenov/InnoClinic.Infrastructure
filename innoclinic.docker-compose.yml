@@ -1,0 +1,97 @@
+version: '3.4'
+
+services:
+  innoclinic.api:
+    image: ${DOCKER_REGISTRY-}innoclinicappointmentsapi
+    container_name: innoclinic.api
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=https://+:5001;http://+:80
+    build:
+      context: ../InnoClinicSystem/InnoClinic.AppointmentsApi
+      dockerfile: Dockerfile
+    ports:
+      - "8081:80"
+      - "5001:5001"
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/root/.aspnet/https:ro
+    depends_on:
+      - innoclinic.rabbitmq
+      - innoclinic.database
+    networks: 
+      - "innoclinicnetwork"
+
+  innoclinic.database:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: innoclinic.db
+    environment: 
+      - ACCEPT_EULA=Y
+      - DATABASE_NAME=InnoClinic
+      - SA_PASSWORD=Test_Password
+    volumes:
+      - ./.containers/innoclinic-db:/var/lib/sqlserver/data
+    ports:
+      - "1434:1433"
+    networks: 
+      - "innoclinicnetwork"
+    
+  innoclinic.identity:
+    image: ${DOCKER_REGISTRY-}innoclinicidentity
+    container_name: innoclinic.identity
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=https://+:5002;http://+:80
+    build:
+      context: ../InnoClinicIdentity/InnoClinic.Identity/InnoClinic.Identity
+      dockerfile: Dockerfile
+    ports: 
+      - "8082:80"
+      - "5002:5002"
+    volumes:
+      - ${APPDATA}/Microsoft/UserSecrets:/root/.microsoft/usersecrets:ro
+      - ${APPDATA}/ASP.NET/Https:/root/.aspnet/https:ro
+    depends_on:
+      - innoclinic.rabbitmq
+      - innoclinic.identity.database
+    networks: 
+      - "innoclinicnetwork"
+  
+  innoclinic.identity.database:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: innoclinic.identity.db
+    environment: 
+      - ACCEPT_EULA=Y
+      - DATABASE_NAME=InnoClinic.Identity
+      - SA_PASSWORD=Test_Password
+    volumes:
+      - ./.containers/innoclinic.identity-db:/var/lib/sqlserver/data
+    ports:
+      - "1433:1433"
+    networks: 
+      - "innoclinicnetwork"
+
+  innoclinic.rabbitmq:
+    image: rabbitmq:3.10-management
+    container_name: innoclinic.rabbitmq
+    hostname: rabbitmq
+    ports: 
+      - "5672:5672"
+      - "15672:15672"
+    networks: 
+      - "innoclinicnetwork"
+  
+  innoclinic.client:
+    image: ${DOCKER_REGISTRY-}innoclinicclient
+    container_name: innoclinic.client
+    build:
+      context: ../InnoClinic.Client/InnoClinic.Client
+      dockerfile: Dockerfile
+    ports:
+      - "4200:4200"
+    networks: 
+      - "innoclinicnetwork"
+
+networks:
+  innoclinicnetwork:
+    driver: "bridge"
